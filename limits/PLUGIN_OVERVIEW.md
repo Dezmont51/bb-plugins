@@ -39,9 +39,9 @@ ones bb ships collectors for.
 - **OpenCode Go**: set `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY`), or let
   the plugin pick the key of the `opencode-go` (then `opencode`) provider
   from `~/.pi/agent/auth.json` — `OPENCODE_AUTH_FILE` overrides that path.
-  Usage is read from `opencode.ai/inference/go/v1/usage`; the chip stays
-  hidden while no key is found (its `showOpencodeGo` setting is on by
-  default). That endpoint reports one aggregate for the whole plan — the
+  Usage is read from `opencode.ai/inference/go/v1/usage`; the chip and its
+  dialog row stay hidden while no key is found (its `showOpencodeGo` setting
+  is on by default). That endpoint reports one aggregate for the whole plan — the
   `?model=` parameter and the `X-Opencode-Model` header are ignored, so the
   console's per-model lanes are not available through the API — and its
   `percent` is the used share of the window, which the chip renders as the

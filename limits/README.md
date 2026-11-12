@@ -35,9 +35,9 @@ has no collectors for, fetched directly by this plugin:
   instead of silence.
 - Which providers get a chip is set in plugin settings; Claude Code, Codex,
   Cursor, GLM (Z.AI), Kimi Code and OpenCode Go are all on by default
-  (`showOpencodeGo` for OpenCode Go). The `show*` settings only hide chips in
-  the UI — the server still collects an already-cached snapshot for every
-  provider it knows.
+  (`showOpencodeGo` for OpenCode Go). A `show*` setting hides both that
+  provider's chip and its row in the details dialog; the server still collects
+  a snapshot for every provider it knows, so `bb limits` keeps listing them.
 - Data comes from `system.usageLimits()` behind a cached background refresh
   (`refreshSeconds`), with a disk fallback for Codex.
 

@@ -588,11 +588,14 @@ function LimitsDialog({
   onOpenChange,
   data,
   reload,
+  visibleIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: SnapshotData | null;
   reload: (force?: boolean) => Promise<void>;
+  /** Providers whose chip is enabled — the dialog obeys the same settings. */
+  visibleIds: string[];
 }) {
   const [busy, setBusy] = useState(false);
   const stamp = data?.fetchedAt ?? null;
@@ -611,9 +614,11 @@ function LimitsDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-2 items-start gap-3">
-          {(data?.providers ?? []).map((provider) => (
-            <ProviderRow key={provider.key} provider={provider} />
-          ))}
+          {(data?.providers ?? [])
+            .filter((provider) => visibleIds.includes(provider.providerId))
+            .map((provider) => (
+              <ProviderRow key={provider.key} provider={provider} />
+            ))}
           {data?.error == null ? null : (
             <p className="text-xs text-destructive">{data.error}</p>
           )}
@@ -1197,6 +1202,7 @@ function LimitsOverlay() {
         onOpenChange={setDialogOpen}
         data={data}
         reload={reload}
+        visibleIds={visible.map((block) => block.providerId)}
       />
     </div>
   );
