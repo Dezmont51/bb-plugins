@@ -1,12 +1,12 @@
 // Direct collectors for coding-plan providers BB does not know about:
-// Z.AI GLM Coding Plan and Kimi Code.
+// Z.AI GLM Coding Plan, Kimi Code and OpenCode Go.
 //
 // BB's system.usageLimits() only covers the providers it ships (claude-code,
-// codex, ACP). These two plans are consumed through Anthropic-compatible
-// endpoints from CLIs, so their quota is fetched here, straight from the
-// plans' own usage endpoints, with credentials read off disk exactly where
-// the CLIs keep them. Collection only ever runs inside an explicit refresh
-// cycle — in manual mode nothing is requested at all.
+// codex, ACP). These plans are consumed through provider-compatible endpoints
+// from CLIs, so their quota is fetched here, straight from the plans' own
+// usage endpoints, with credentials read off disk exactly where the CLIs keep
+// them. Collection only ever runs inside an explicit refresh cycle — in
+// manual mode nothing is requested at all.
 import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -398,6 +398,122 @@ export async function readKimiUsage(
 
   if (windows.length === 0) return failed("no limits reported");
   return { status: "ok", message: null, planLabel: null, windows };
+}
+
+const OPENCODE_GO_USAGE_URL = "https://opencode.ai/inference/go/v1/usage";
+
+/** `~/.pi/agent/auth.json` — providerId → { type: "api_key", key }. */
+type PiAuthFile = Record<string, { key?: unknown } | undefined>;
+
+/**
+ * OpenCode keeps no credentials of its own on disk for non-CLI clients, so
+ * the key comes from wherever a harness already stored it: the pi provider
+ * (`~/.pi/agent/auth.json`) or the environment.
+ *
+ * OPENCODE_AUTH_FILE, when set, is the ONLY file consulted — an explicit
+ * override never falls back to `~/.pi/agent/auth.json` (which may hold a
+ * live key the caller did not mean to use).
+ */
+async function readOpencodeKey(): Promise<string | null> {
+  for (const name of ["OPENCODE_GO_API_KEY", "OPENCODE_API_KEY"]) {
+    const value = process.env[name];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+
+  const candidates: string[] = [];
+  const override = process.env.OPENCODE_AUTH_FILE;
+  if (typeof override === "string" && override.length > 0) {
+    candidates.push(override);
+  } else {
+    candidates.push(join(homedir(), ".pi", "agent", "auth.json"));
+  }
+
+  for (const path of candidates) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readFile(path, "utf8"));
+    } catch {
+      continue;
+    }
+    // A syntactically valid non-object (e.g. `null`) is an unusable auth
+    // document, not a reason to throw out of the whole refresh.
+    if (parsed === null || typeof parsed !== "object") continue;
+    const authFile = parsed as PiAuthFile;
+    for (const provider of ["opencode-go", "opencode"]) {
+      const key = authFile[provider]?.key;
+      if (typeof key === "string" && key.length > 0) return key;
+    }
+  }
+  return null;
+}
+
+interface OpencodeWindow {
+  status?: unknown;
+  percent?: unknown;
+  resetsAt?: unknown;
+}
+
+/**
+ * OpenCode Go / Go Plus / Go Teams: `percent` is the used share of each
+ * window (a fresh plan reports 0), `resetsAt` its reset instant. The plan's
+ * monthly dollar limit is split 5-hour 20% / weekly 50% / monthly 100%, which
+ * is why three windows come back.
+ */
+export async function readOpencodeGoUsage(): Promise<CustomUsage> {
+  const key = await readOpencodeKey();
+  if (key === null) return notInstalled();
+
+  let result: FetchResult;
+  try {
+    result = await fetchJson(OPENCODE_GO_USAGE_URL, {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+      // The plan asks clients to identify themselves rather than posing as a
+      // generic HTTP library.
+      "User-Agent": "bb-plugin-limits/1.1",
+    });
+  } catch (error) {
+    return failed(error instanceof Error ? error.message : String(error));
+  }
+
+  if (result.httpStatus === 401 || result.httpStatus === 403) {
+    return { ...notInstalled(), status: "unauthenticated" };
+  }
+  if (result.httpStatus === 404) {
+    return failed("no OpenCode Go subscription on this key");
+  }
+  if (result.body === null) return failed(`HTTP ${result.httpStatus}`);
+
+  const usage = (result.body as { usage?: Record<string, OpencodeWindow> })
+    .usage;
+  if (usage === undefined || usage === null) return failed("no usage reported");
+
+  const windows: CustomWindow[] = [];
+  const problems: string[] = [];
+  for (const [id, label] of [
+    ["rolling", "5-hour"],
+    ["weekly", "Weekly"],
+    ["monthly", "Monthly"],
+  ] as const) {
+    const window = usage[id];
+    if (window === undefined) continue;
+    const status = typeof window.status === "string" ? window.status : "ok";
+    if (status !== "ok") problems.push(`${label.toLowerCase()}: ${status}`);
+    if (typeof window.percent !== "number") continue;
+    windows.push({
+      label,
+      usedPercent: clampPercent(window.percent),
+      resetsAt: typeof window.resetsAt === "string" ? window.resetsAt : null,
+    });
+  }
+  if (windows.length === 0) return failed("no limits reported");
+
+  return {
+    status: "ok",
+    message: problems.length === 0 ? null : problems.join(", "),
+    planLabel: null,
+    windows,
+  };
 }
 
 async function fetchUsages(token: string): Promise<FetchResult> {

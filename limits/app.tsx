@@ -165,6 +165,7 @@ const BRANDS: Record<
 > = {
   "zai-glm": { letter: "Z" },
   "kimi-coding": { letter: "K" },
+  "opencode-go": { letter: "O" },
   // Claude's starburst fills its frame edge-to-edge; scale it down so it
   // keeps the same visual padding inside the ring as the other marks.
   "claude-code": {
@@ -670,6 +671,12 @@ const PROVIDER_BLOCKS = [
     default: true,
     label: "Kimi Code",
   },
+  {
+    providerId: "opencode-go",
+    setting: "showOpencodeGo",
+    default: true,
+    label: "OpenCode Go",
+  },
 ] as const;
 
 /** Inline refresh: force-fetch ONE provider — the one the pill leads with. */
@@ -915,7 +922,11 @@ function LimitsOverlay() {
 
   // The collapsed pill follows the OPEN THREAD: its provider when tracked,
   // else the plan its model runs on (a kimi* model shows Kimi, glm* — GLM;
-  // those harnesses run through providers like pi). The pinned setting is a
+  // those harnesses run through providers like pi). OpenCode Go model ids
+  // are `opencode-go/<model>` (e.g. opencode-go/kimi-k3.1-pro,
+  // opencode-go/glm-5.3), so the prefix check must run BEFORE the kimi/glm
+  // substring heuristics — otherwise those models would wrongly show the
+  // Kimi or GLM chip. The pinned setting is a
   // fallback for when neither resolves, and the scarcest plan is the last
   // resort.
   const active =
@@ -927,7 +938,11 @@ function LimitsOverlay() {
   );
   if (resolved === undefined && threadModel?.model != null) {
     const model = threadModel.model.toLowerCase();
-    if (model.includes("kimi")) {
+    if (model.startsWith("opencode")) {
+      resolved = visible.find(
+        (block) => block.providerId === "opencode-go",
+      );
+    } else if (model.includes("kimi")) {
       resolved = visible.find((block) => block.providerId === "kimi-coding");
     } else if (model.includes("glm")) {
       resolved = visible.find((block) => block.providerId === "zai-glm");
