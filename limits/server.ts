@@ -9,7 +9,7 @@ import { defineRpcContract, type BbPluginApi } from "@bb/plugin-sdk";
 import { z } from "zod";
 
 import { readCodexSnapshot } from "./codex-fallback";
-import { readKimiUsage, readZaiUsage } from "./custom-providers";
+import { readKimiUsage, readOpencodeGoUsage, readZaiUsage } from "./custom-providers";
 
 /** Cache key holding the last snapshot so a reload starts warm. */
 const SNAPSHOT_KEY = "snapshot";
@@ -42,6 +42,11 @@ const CUSTOM_PROVIDERS = [
         load: async () => (await bb.storage.kv.get("kimiAuth")) ?? null,
         save: (auth) => bb.storage.kv.set("kimiAuth", auth),
       }),
+  },
+  {
+    providerId: "opencode-go",
+    label: "OpenCode Go",
+    collect: () => readOpencodeGoUsage(),
   },
 ] as const;
 
@@ -181,11 +186,16 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Header chip — Kimi Code",
       default: true,
     },
+    showOpencodeGo: {
+      type: "boolean",
+      label: "Header chip — OpenCode Go",
+      default: true,
+    },
     collapsedProvider: {
       type: "select",
       label: "Collapsed pill fallback",
       description:
-        "The collapsed pill follows the open thread: its provider, or the plan its model runs on (a kimi* model shows Kimi, glm* shows GLM). This fallback applies only when neither can be resolved — e.g. the harness runs in a terminal bb cannot see.",
+        "The collapsed pill follows the open thread: its provider, or the plan its model runs on (a kimi* model shows Kimi, glm* shows GLM; ids with an opencode prefix — opencode-go/<model>, including opencode-go/kimi-* and opencode-go/glm-* — resolve to OpenCode Go before those heuristics). This fallback applies only when neither can be resolved — e.g. the harness runs in a terminal bb cannot see.",
       options: [
         "auto",
         "claude-code",
@@ -193,6 +203,7 @@ export default async function plugin(bb: BbPluginApi) {
         "acp-cursor",
         "zai-glm",
         "kimi-coding",
+        "opencode-go",
       ],
       default: "auto",
     },

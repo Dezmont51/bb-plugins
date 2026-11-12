@@ -165,6 +165,7 @@ const BRANDS: Record<
 > = {
   "zai-glm": { letter: "Z" },
   "kimi-coding": { letter: "K" },
+  "opencode-go": { letter: "O" },
   // Claude's starburst fills its frame edge-to-edge; scale it down so it
   // keeps the same visual padding inside the ring as the other marks.
   "claude-code": {
@@ -587,11 +588,14 @@ function LimitsDialog({
   onOpenChange,
   data,
   reload,
+  visibleIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: SnapshotData | null;
   reload: (force?: boolean) => Promise<void>;
+  /** Providers whose chip is enabled — the dialog obeys the same settings. */
+  visibleIds: string[];
 }) {
   const [busy, setBusy] = useState(false);
   const stamp = data?.fetchedAt ?? null;
@@ -610,9 +614,11 @@ function LimitsDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-2 items-start gap-3">
-          {(data?.providers ?? []).map((provider) => (
-            <ProviderRow key={provider.key} provider={provider} />
-          ))}
+          {(data?.providers ?? [])
+            .filter((provider) => visibleIds.includes(provider.providerId))
+            .map((provider) => (
+              <ProviderRow key={provider.key} provider={provider} />
+            ))}
           {data?.error == null ? null : (
             <p className="text-xs text-destructive">{data.error}</p>
           )}
@@ -669,6 +675,12 @@ const PROVIDER_BLOCKS = [
     setting: "showKimiCode",
     default: true,
     label: "Kimi Code",
+  },
+  {
+    providerId: "opencode-go",
+    setting: "showOpencodeGo",
+    default: true,
+    label: "OpenCode Go",
   },
 ] as const;
 
@@ -915,7 +927,11 @@ function LimitsOverlay() {
 
   // The collapsed pill follows the OPEN THREAD: its provider when tracked,
   // else the plan its model runs on (a kimi* model shows Kimi, glm* — GLM;
-  // those harnesses run through providers like pi). The pinned setting is a
+  // those harnesses run through providers like pi). OpenCode Go model ids
+  // are `opencode-go/<model>` (e.g. opencode-go/kimi-k3.1-pro,
+  // opencode-go/glm-5.3), so the prefix check must run BEFORE the kimi/glm
+  // substring heuristics — otherwise those models would wrongly show the
+  // Kimi or GLM chip. The pinned setting is a
   // fallback for when neither resolves, and the scarcest plan is the last
   // resort.
   const active =
@@ -927,7 +943,11 @@ function LimitsOverlay() {
   );
   if (resolved === undefined && threadModel?.model != null) {
     const model = threadModel.model.toLowerCase();
-    if (model.includes("kimi")) {
+    if (model.startsWith("opencode")) {
+      resolved = visible.find(
+        (block) => block.providerId === "opencode-go",
+      );
+    } else if (model.includes("kimi")) {
       resolved = visible.find((block) => block.providerId === "kimi-coding");
     } else if (model.includes("glm")) {
       resolved = visible.find((block) => block.providerId === "zai-glm");
@@ -1182,6 +1202,7 @@ function LimitsOverlay() {
         onOpenChange={setDialogOpen}
         data={data}
         reload={reload}
+        visibleIds={visible.map((block) => block.providerId)}
       />
     </div>
   );

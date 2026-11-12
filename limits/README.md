@@ -2,7 +2,7 @@
 
 Remaining usage limits for each connected provider — as a floating chip row
 in the app's top strip (visible on every surface, not just threads). Covers
-Claude Code, Codex and Cursor through bb's own collectors, plus two plans bb
+Claude Code, Codex and Cursor through bb's own collectors, plus three plans bb
 has no collectors for, fetched directly by this plugin:
 
 - **GLM (Z.AI) Coding Plan**: `api.z.ai/api/monitor/usage/quota/limit`,
@@ -12,6 +12,16 @@ has no collectors for, fetched directly by this plugin:
   kimi-code CLI credentials (`~/.kimi-code/credentials/kimi-code.json` or
   `$KIMI_CODE_CREDENTIALS`); shows the 7-day and 5-hour windows. Hidden until
   the credentials exist.
+- **OpenCode Go**: `opencode.ai/inference/go/v1/usage`, key from
+  `OPENCODE_GO_API_KEY`, else `OPENCODE_API_KEY`, else `~/.pi/agent/auth.json`
+  (provider `opencode-go`, then `opencode`; the path can be overridden with
+  `OPENCODE_AUTH_FILE`); shows the 5-hour, Weekly and Monthly windows. Hidden
+  until a key exists. `percent` in the response is the share of the window
+  already **used** (0..100 — a fresh subscription reports 0), so the chip
+  renders `100 - percent` as the remaining share. The endpoint returns one
+  **aggregate for the whole plan**: the `?model=` parameter and the
+  `X-Opencode-Model` header are ignored, so the per-model lanes the OpenCode
+  console draws are not available through this API and are not shown here.
 
 - **Top-strip overlay** (app-wide, via `experimental_appOverlay`): one chip
   per provider — a large brand mark, one small ring per limit window showing
@@ -24,7 +34,10 @@ has no collectors for, fetched directly by this plugin:
   without closing. A provider that reports nothing gets a dashed ghost ring
   instead of silence.
 - Which providers get a chip is set in plugin settings; Claude Code, Codex,
-  Cursor, GLM (Z.AI) and Kimi Code are all on by default.
+  Cursor, GLM (Z.AI), Kimi Code and OpenCode Go are all on by default
+  (`showOpencodeGo` for OpenCode Go). A `show*` setting hides both that
+  provider's chip and its row in the details dialog; the server still collects
+  a snapshot for every provider it knows, so `bb limits` keeps listing them.
 - Data comes from `system.usageLimits()` behind a cached background refresh
   (`refreshSeconds`), with a disk fallback for Codex.
 

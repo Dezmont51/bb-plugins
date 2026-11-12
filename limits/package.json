@@ -1,7 +1,10 @@
 {
   "name": "bb-plugin-limits",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test --test-concurrency=1 custom-providers.test.ts"
+  },
   "engines": {
     "bb": ">=0.46",
     "bbPluginSdk": "^0.4.1"
